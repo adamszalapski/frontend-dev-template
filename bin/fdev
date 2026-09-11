@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -eo pipefail
 
 NODE_VERSION_FILE=".node-version"
 
@@ -21,6 +21,22 @@ export NODE_VERSION
 COMMAND="${1:-help}"
 shift || true
 
+COMPOSE_ARGS=()
+COMMAND_ARGS=()
+
+for arg in "$@"; do
+  case "$arg" in
+    --db)
+      COMPOSE_ARGS+=(--profile db)
+      ;;
+    *)
+      COMMAND_ARGS+=("$arg")
+      ;;
+  esac
+done
+
+set -- "${COMMAND_ARGS[@]}"
+
 is_running() {
   docker compose ps --status running --services | grep -q '^app$'
 }
@@ -35,15 +51,15 @@ require_running() {
 
 case "$COMMAND" in
   up)
-    docker compose up -d "$@"
+    docker compose "${COMPOSE_ARGS[@]}" up -d "$@"
     ;;
 
   stop)
-    docker compose stop "$@"
+    docker compose "${COMPOSE_ARGS[@]}" stop "$@"
     ;;
 
   down)
-    docker compose down "$@"
+    docker compose "${COMPOSE_ARGS[@]}" down "$@"
     ;;
 
   destroy)
@@ -61,11 +77,11 @@ case "$COMMAND" in
     ;;
 
   restart)
-    docker compose restart "$@"
+    docker compose "${COMPOSE_ARGS[@]}" restart "$@"
     ;;
 
   rebuild)
-    docker compose up -d --build "$@"
+    docker compose "${COMPOSE_ARGS[@]}" up -d --build "$@"
     ;;
 
   shell)
@@ -108,16 +124,32 @@ case "$COMMAND" in
     echo "Project:   $(basename "$PWD")"
     echo "Path:      $PWD"
     echo "Node:      $NODE_VERSION"
+    echo
+
+    echo "Services:"
+
+    if docker compose ps --status running --services | grep -q '^app$'; then
+      echo "  app       running"
+    else
+      echo "  app       stopped"
+    fi
+
+    if docker compose --profile db ps --status running --services | grep -q '^postgres$'; then
+      DB_STATUS="$(docker inspect \
+        --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+        "$(docker compose --profile db ps -q postgres)" 2>/dev/null || true)"
+
+      echo "  postgres  ${DB_STATUS:-running}"
+    else
+      echo "  postgres  stopped"
+    fi
 
     if is_running; then
-      echo "Status:    running"
       echo
       echo "Runtime:"
       echo "  Node:     $(docker compose exec -T app node --version)"
       echo "  pnpm:     $(docker compose exec -T app pnpm --version)"
       echo "  Corepack: $(docker compose exec -T app corepack --version)"
-    else
-      echo "Status:    stopped"
     fi
     ;;
 
