@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NODE_VERSION_FILE=".node-version"
+
+if [[ ! -f "$NODE_VERSION_FILE" ]]; then
+  echo "fdev: missing .node-version"
+  exit 1
+fi
+
+NODE_VERSION="$(tr -d '[:space:]' < "$NODE_VERSION_FILE")"
+
+if [[ -z "$NODE_VERSION" ]]; then
+  echo "fdev: .node-version is empty"
+  exit 1
+fi
+
+export NODE_VERSION
+
+COMMAND="${1:-help}"
+shift || true
+
+case "$COMMAND" in
+  up)
+    docker compose up -d "$@"
+    ;;
+
+  down)
+    docker compose down "$@"
+    ;;
+
+  restart)
+    docker compose restart "$@"
+    ;;
+
+  rebuild)
+    docker compose up -d --build "$@"
+    ;;
+
+  shell)
+    docker compose exec app bash "$@"
+    ;;
+
+  node)
+    docker compose exec app node "$@"
+    ;;
+
+  pnpm)
+    docker compose exec app pnpm "$@"
+    ;;
+
+  logs)
+    docker compose logs -f "$@"
+    ;;
+
+  ps)
+    docker compose ps "$@"
+    ;;
+
+  version)
+    echo "Node:     $(docker compose exec -T app node --version)"
+    echo "pnpm:     $(docker compose exec -T app pnpm --version)"
+    echo "Corepack: $(docker compose exec -T app corepack --version)"
+    ;;
+
+  help|--help|-h)
+    cat <<'HELP'
+Frontend Development Environment
+
+Usage:
+  fdev <command>
+
+Commands:
+  up          Start the environment
+  down        Stop and remove containers
+  restart     Restart containers
+  rebuild     Rebuild and start containers
+
+  shell       Open a shell in the app container
+  node        Run Node inside the app container
+  pnpm        Run pnpm inside the app container
+
+  logs        Follow container logs
+  ps          Show container status
+  version     Show runtime versions
+
+  help        Show this help
+HELP
+    ;;
+
+  *)
+    echo "Unknown command: $COMMAND"
+    echo
+    echo "Run 'fdev help' for available commands."
+    exit 1
+    ;;
+esac

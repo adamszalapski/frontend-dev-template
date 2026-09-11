@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION}
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - node_modules:/workspace/node_modules
+    ports:
+      - "3000:3000"
+    tty: true
+    stdin_open: true
+
+volumes:
+  node_modules:
