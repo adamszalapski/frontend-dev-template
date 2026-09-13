@@ -193,7 +193,8 @@ case "$COMMAND" in
     rm -rf "$INSTALL_DIR/templates/base"
     cp -R "$FDEV_ROOT/templates/base" "$INSTALL_DIR/templates/base"
     cp "$FDEV_ROOT/package.json" "$INSTALL_DIR/package.json"
-
+    cp "$FDEV_ROOT/.node-version" "$INSTALL_DIR/.node-version"
+    
     chmod +x "$INSTALL_DIR/bin/fdev"
     chmod +x "$INSTALL_DIR/bin/fe"
 

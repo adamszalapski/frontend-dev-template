@@ -40,8 +40,8 @@ initialize_project() {
 
   copy_template_file "compose.yaml"
   copy_template_file ".env.example"
-  copy_template_file ".node-version"
 
+  create_node_version
   create_package_json
 
   copy_template_file "docker/app/Dockerfile"
@@ -84,4 +84,36 @@ create_package_json() {
     "$package_manager" > "$target"
 
   success "created package.json ($package_manager)"
+}
+
+get_node_version() {
+  local version_file="$FDEV_ROOT/.node-version"
+
+  if [[ ! -f "$version_file" ]]; then
+    error "fdev .node-version is missing"
+    return 1
+  fi
+
+  tr -d '[:space:]' < "$version_file"
+}
+
+create_node_version() {
+  local target="$PROJECT_DIR/.node-version"
+  local node_version
+
+  if [[ -f "$target" ]]; then
+    warn "skipping .node-version (already exists)"
+    return 0
+  fi
+
+  node_version="$(get_node_version)"
+
+  if [[ -z "$node_version" ]]; then
+    error "Node version is not defined in fdev"
+    return 1
+  fi
+
+  printf '%s\n' "$node_version" > "$target"
+
+  success "created .node-version (Node $node_version)"
 }
