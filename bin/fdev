@@ -28,7 +28,7 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  help|--help|-h|doctor|install-cli)
+  help|--help|-h|doctor|install-cli|init)
     ;;
   *)
     require_fdev_project
@@ -101,6 +101,24 @@ case "$COMMAND" in
   pnpm)
     require_running
     compose exec app pnpm "$@"
+    ;;
+
+  init)
+    CONFIG_DIR="$PROJECT_DIR/.fdev"
+    CONFIG_FILE="$CONFIG_DIR/config.yaml"
+
+    if [[ -f "$CONFIG_FILE" ]]; then
+      warn "project is already initialized"
+      info "$CONFIG_FILE already exists"
+      exit 0
+    fi
+
+    mkdir -p "$CONFIG_DIR"
+
+    printf 'version: 1\n' > "$CONFIG_FILE"
+
+    success "initialized fdev project"
+    info "created .fdev/config.yaml"
     ;;
 
   install)
@@ -369,6 +387,7 @@ Environment:
   destroy     Remove containers and project volumes
 
 Setup:
+  init        Initialize fdev in the current project
   install-cli Install fdev and fe globally
 
 Development:
