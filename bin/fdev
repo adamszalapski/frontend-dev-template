@@ -176,7 +176,8 @@ case "$COMMAND" in
     cp "$SCRIPT_DIR/lib/"*.sh "$INSTALL_DIR/bin/lib/"
 
     rm -rf "$INSTALL_DIR/templates/base"
-    cp -R "$SCRIPT_DIR/../templates/base" "$INSTALL_DIR/templates/base"
+    cp -R "$FDEV_ROOT/templates/base" "$INSTALL_DIR/templates/base"
+    cp "$FDEV_ROOT/package.json" "$INSTALL_DIR/package.json"
 
     chmod +x "$INSTALL_DIR/bin/fdev"
     chmod +x "$INSTALL_DIR/bin/fe"
@@ -295,13 +296,15 @@ case "$COMMAND" in
     fi
 
     if [[ "$DOCTOR_FAILED" -ne 0 ]]; then
-      echo
       error "environment check failed"
       exit 1
     fi
 
-    echo
-    success "environment looks healthy"
+    if is_running; then
+      success "environment looks healthy"
+    else
+      success "configuration looks healthy"
+    fi
     ;;
 
   info)

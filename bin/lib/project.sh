@@ -41,8 +41,47 @@ initialize_project() {
   copy_template_file "compose.yaml"
   copy_template_file ".env.example"
   copy_template_file ".node-version"
+
+  create_package_json
+
   copy_template_file "docker/app/Dockerfile"
 
   echo
   success "fdev project is ready"
+}
+
+get_package_manager() {
+  local package_file="$FDEV_ROOT/package.json"
+
+  if [[ ! -f "$package_file" ]]; then
+    error "fdev package.json is missing"
+    return 1
+  fi
+
+  sed -n \
+    's/.*"packageManager"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    "$package_file" |
+    head -n 1
+}
+
+create_package_json() {
+  local target="$PROJECT_DIR/package.json"
+  local package_manager
+
+  if [[ -f "$target" ]]; then
+    warn "skipping package.json (already exists)"
+    return 0
+  fi
+
+  package_manager="$(get_package_manager)"
+
+  if [[ -z "$package_manager" ]]; then
+    error "packageManager is not defined in fdev package.json"
+    return 1
+  fi
+
+  printf '{\n  "private": true,\n  "packageManager": "%s"\n}\n' \
+    "$package_manager" > "$target"
+
+  success "created package.json ($package_manager)"
 }

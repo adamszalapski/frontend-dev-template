@@ -10,7 +10,9 @@ services:
       - .:/workspace
       - node_modules:/workspace/node_modules
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - target: 3000
+        published: "${APP_PORT:-3000-3099}"
+        host_ip: 127.0.0.1
     tty: true
     stdin_open: true
 
@@ -24,8 +26,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test:
         [
