@@ -36,6 +36,11 @@ shift || true
 case "$COMMAND" in
   help|--help|-h|doctor|install-cli|init|templates)
     ;;
+
+  update)
+    require_fdev_project
+    ;;
+
   *)
     require_fdev_project
     load_node_version
@@ -118,6 +123,10 @@ case "$COMMAND" in
     TEMPLATE_NAME="${1:-$DEFAULT_TEMPLATE}"
 
     initialize_project "$TEMPLATE_NAME"
+    ;;
+
+  update)
+    update_project
     ;;
 
   templates)
@@ -424,6 +433,7 @@ Environment:
 
 Setup:
   init [template]   Initialize fdev project
+  update            Update fdev-managed project files
   templates         List available project templates
   install-cli       Install fdev and fe globally
 

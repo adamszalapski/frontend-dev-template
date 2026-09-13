@@ -211,3 +211,74 @@ copy_template_files() {
     success "created $relative_path"
   done < <(find "$source_root" -type f | sort)
 }
+
+get_project_template() {
+  local config_file="$PROJECT_DIR/.fdev/config.yaml"
+
+  if [[ ! -f "$config_file" ]]; then
+    error ".fdev/config.yaml is missing"
+    return 1
+  fi
+
+  sed -n \
+    's/^[[:space:]]*template:[[:space:]]*\(.*\)[[:space:]]*$/\1/p' \
+    "$config_file" |
+    head -n 1
+}
+
+update_project() {
+  local template_name
+  local template_dir
+  local source_root
+  local source
+  local relative_path
+  local target
+
+  template_name="$(get_project_template)" || return 1
+
+  if [[ -z "$template_name" ]]; then
+    error "template is not defined in .fdev/config.yaml"
+    return 1
+  fi
+
+  require_template "$template_name" || return 1
+
+  template_dir="$(get_template_dir "$template_name")"
+  source_root="$template_dir/.fdev"
+
+  if [[ ! -d "$source_root" ]]; then
+    error "template '$template_name' does not contain .fdev directory"
+    return 1
+  fi
+
+  info "updating project from template '$template_name'"
+  echo
+
+  while IFS= read -r source; do
+    relative_path="${source#"$template_dir/"}"
+    target="$PROJECT_DIR/$relative_path"
+
+    # Local fdev configuration must never be overwritten.
+    if [[ "$relative_path" == ".fdev/.env" ]]; then
+      continue
+    fi
+
+    mkdir -p "$(dirname "$target")"
+
+    if [[ -f "$target" ]] && cmp -s "$source" "$target"; then
+      info "unchanged $relative_path"
+      continue
+    fi
+
+    if [[ -e "$target" ]]; then
+      cp "$source" "$target"
+      success "updated $relative_path"
+    else
+      cp "$source" "$target"
+      success "created $relative_path"
+    fi
+  done < <(find "$source_root" -type f | sort)
+
+  echo
+  success "fdev project is up to date"
+}
