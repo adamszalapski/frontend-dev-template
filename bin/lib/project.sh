@@ -141,6 +141,7 @@ list_templates() {
   local metadata_file
   local template_name
   local name
+  local version
   local description
   local found=0
 
@@ -170,9 +171,12 @@ list_templates() {
         head -n 1
     )"
 
-    printf "  %-12s %-18s %s\n" \
+    version="$(get_template_version "$template_name")"
+
+    printf "  %-12s %-18s v%-6s %s\n" \
       "$template_name" \
       "${name:-$template_name}" \
+      "${version:-?}" \
       "$description"
 
     found=1
@@ -281,4 +285,22 @@ update_project() {
 
   echo
   success "fdev project is up to date"
+}
+
+get_template_version() {
+  local template_name="$1"
+  local template_dir
+  local metadata_file
+
+  template_dir="$(get_template_dir "$template_name")"
+  metadata_file="$template_dir/template.yaml"
+
+  if [[ ! -f "$metadata_file" ]]; then
+    return 1
+  fi
+
+  sed -n \
+    's/^[[:space:]]*version:[[:space:]]*\(.*\)[[:space:]]*$/\1/p' \
+    "$metadata_file" |
+    head -n 1
 }
