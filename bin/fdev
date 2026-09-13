@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/output.sh"
 source "$SCRIPT_DIR/lib/docker.sh"
 source "$SCRIPT_DIR/lib/env.sh"
+source "$SCRIPT_DIR/lib/args.sh"
 
 NODE_VERSION_FILE=".node-version"
 
@@ -35,20 +36,7 @@ case "$COMMAND" in
     ;;
 esac
 
-COMPOSE_ARGS=()
-COMMAND_ARGS=()
-
-for arg in "$@"; do
-  case "$arg" in
-    --db)
-      COMPOSE_ARGS+=(--profile db)
-      ;;
-    *)
-      COMMAND_ARGS+=("$arg")
-      ;;
-  esac
-done
-
+parse_args "$@"
 set -- "${COMMAND_ARGS[@]}"
 
 case "$COMMAND" in
