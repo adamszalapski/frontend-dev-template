@@ -1,27 +1,5 @@
 #!/usr/bin/env bash
 
-copy_template_file() {
-  local template_dir="$1"
-  local relative_path="$2"
-  local source="$template_dir/$relative_path"
-  local target="$PROJECT_DIR/$relative_path"
-
-  if [[ -e "$target" ]]; then
-    warn "skipping $relative_path (already exists)"
-    return 0
-  fi
-
-  if [[ ! -e "$source" ]]; then
-    error "template file is missing: $relative_path"
-    return 1
-  fi
-
-  mkdir -p "$(dirname "$target")"
-  cp -R "$source" "$target"
-
-  success "created $relative_path"
-}
-
 initialize_project() {
   local template_name="${1:-$DEFAULT_TEMPLATE}"
   local template_dir
@@ -57,13 +35,10 @@ initialize_project() {
     success "created .fdev/config.yaml"
   fi
 
-  copy_template_file "$template_dir" ".fdev/compose.yaml"
-  copy_template_file "$template_dir" ".fdev/.env.example"
+  copy_template_files "$template_dir"
 
   create_node_version
   create_package_json
-
-  copy_template_file "$template_dir" ".fdev/docker/app/Dockerfile"
 
   echo
   success "fdev project is ready"
@@ -207,4 +182,32 @@ list_templates() {
     warn "no templates are available"
     return 1
   fi
+}
+
+copy_template_files() {
+  local template_dir="$1"
+  local source_root="$template_dir/.fdev"
+  local source
+  local relative_path
+  local target
+
+  if [[ ! -d "$source_root" ]]; then
+    error "template does not contain .fdev directory"
+    return 1
+  fi
+
+  while IFS= read -r source; do
+    relative_path="${source#"$template_dir/"}"
+    target="$PROJECT_DIR/$relative_path"
+
+    if [[ -e "$target" ]]; then
+      warn "skipping $relative_path (already exists)"
+      continue
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    cp "$source" "$target"
+
+    success "created $relative_path"
+  done < <(find "$source_root" -type f | sort)
 }
