@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: docker/app/Dockerfile
+      dockerfile: .fdev/docker/app/Dockerfile
       args:
         NODE_VERSION: ${NODE_VERSION}
     working_dir: /workspace

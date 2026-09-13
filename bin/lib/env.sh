@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 show_env_hint() {
-  if [[ ! -f "$PROJECT_DIR/.env" && -f "$PROJECT_DIR/.env.example" ]]; then
+  if [[ ! -f "$PROJECT_DIR/.fdev/.env" && -f "$PROJECT_DIR/.fdev/.env.example" ]]; then
     info "using default environment values."
-    info "copy .env.example to .env to customize them."
+    info "copy .fdev/.env.example to .fdev/.env to customize them."
   fi
 }
 

@@ -38,13 +38,13 @@ initialize_project() {
     success "created .fdev/config.yaml"
   fi
 
-  copy_template_file "compose.yaml"
-  copy_template_file ".env.example"
+  copy_template_file ".fdev/compose.yaml"
+  copy_template_file ".fdev/.env.example"
 
   create_node_version
   create_package_json
 
-  copy_template_file "docker/app/Dockerfile"
+  copy_template_file ".fdev/docker/app/Dockerfile"
 
   echo
   success "fdev project is ready"

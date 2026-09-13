@@ -268,13 +268,13 @@ case "$COMMAND" in
       DOCTOR_FAILED=1
     fi
 
-    if [[ -f "$PROJECT_DIR/.env" ]]; then
-      success ".env exists"
-    elif [[ -f "$PROJECT_DIR/.env.example" ]]; then
-      warn ".env does not exist"
-      info "defaults from compose.yaml will be used"
+    if [[ -f "$PROJECT_DIR/.fdev/.env" ]]; then
+      success ".fdev/.env exists"
+    elif [[ -f "$PROJECT_DIR/.fdev/.env.example" ]]; then
+      warn ".fdev/.env does not exist"
+      info "defaults from .fdev/compose.yaml will be used"
     else
-      warn "neither .env nor .env.example exists"
+      warn "neither .fdev/.env nor .fdev/.env.example exists"
     fi
 
     if [[ "$NODE_VERSION_VALID" -eq 1 ]]; then
@@ -433,7 +433,7 @@ Information:
   help        Show this help
 
 Configuration:
-  Copy .env.example to .env to customize ports and database settings.
+  Copy .fdev/.env.example to .fdev/.env to customize fdev settings.
 
 Host requirements:
   Docker with Docker Compose support

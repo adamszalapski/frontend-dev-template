@@ -1,7 +1,19 @@
 #!/usr/bin/env bash
 
 compose() {
-  docker compose --project-directory "$PROJECT_DIR" "$@"
+  local compose_args=(
+    --project-directory "$PROJECT_DIR"
+    -f "$PROJECT_DIR/.fdev/compose.yaml"
+  )
+
+  if [[ -f "$PROJECT_DIR/.fdev/.env" ]]; then
+    compose_args+=(
+      --env-file "$PROJECT_DIR/.fdev/.env"
+    )
+  fi
+
+  COMPOSE_DISABLE_ENV_FILE=1 \
+    docker compose "${compose_args[@]}" "$@"
 }
 
 check_docker() {
