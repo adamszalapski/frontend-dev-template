@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+compose() {
+  docker compose --project-directory "$PROJECT_DIR" "$@"
+}
+
 check_docker() {
   if ! command -v docker >/dev/null 2>&1; then
     error "Docker is not installed or not available on PATH."
@@ -18,7 +22,7 @@ check_docker() {
 }
 
 is_running() {
-  docker compose ps --status running --services | grep -q '^app$'
+  compose ps --status running --services | grep -q '^app$'
 }
 
 require_running() {
@@ -32,9 +36,9 @@ require_running() {
 load_runtime_versions() {
   require_running
 
-  NODE_RUNTIME_VERSION="$(docker compose exec -T app node --version 2>/dev/null || true)"
+  NODE_RUNTIME_VERSION="$(compose exec -T app node --version 2>/dev/null || true)"
   NODE_RUNTIME_VERSION="${NODE_RUNTIME_VERSION#v}"
 
-  PNPM_RUNTIME_VERSION="$(docker compose exec -T app pnpm --version 2>/dev/null || true)"
-  COREPACK_RUNTIME_VERSION="$(docker compose exec -T app corepack --version 2>/dev/null || true)"
+  PNPM_RUNTIME_VERSION="$(compose exec -T app pnpm --version 2>/dev/null || true)"
+  COREPACK_RUNTIME_VERSION="$(compose exec -T app corepack --version 2>/dev/null || true)"
 }

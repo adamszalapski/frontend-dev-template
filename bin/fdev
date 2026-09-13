@@ -3,35 +3,24 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$PWD"
 
 source "$SCRIPT_DIR/lib/output.sh"
 source "$SCRIPT_DIR/lib/docker.sh"
 source "$SCRIPT_DIR/lib/env.sh"
 source "$SCRIPT_DIR/lib/args.sh"
 
-NODE_VERSION_FILE=".node-version"
-
-if [[ ! -f "$NODE_VERSION_FILE" ]]; then
-  error "missing .node-version"
-  exit 1
-fi
-
-NODE_VERSION="$(tr -d '[:space:]' < "$NODE_VERSION_FILE")"
-
-if [[ -z "$NODE_VERSION" ]]; then
-  error ".node-version is empty"
-  exit 1
-fi
-
-export NODE_VERSION
+NODE_VERSION_FILE="$PROJECT_DIR/.node-version"
+NODE_VERSION=""
 
 COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  help|--help|-h)
+  help|--help|-h|doctor)
     ;;
   *)
+    load_node_version
     check_docker
     ;;
 esac
@@ -42,15 +31,15 @@ set -- "${COMMAND_ARGS[@]}"
 case "$COMMAND" in
   up)
     show_env_hint
-    docker compose "${COMPOSE_ARGS[@]}" up -d "$@"
+    compose "${COMPOSE_ARGS[@]}" up -d "$@"
     ;;
 
   stop)
-    docker compose "${COMPOSE_ARGS[@]}" stop "$@"
+    compose "${COMPOSE_ARGS[@]}" stop "$@"
     ;;
 
   down)
-    docker compose "${COMPOSE_ARGS[@]}" down "$@"
+    compose "${COMPOSE_ARGS[@]}" down "$@"
     ;;
 
   destroy)
@@ -59,7 +48,7 @@ case "$COMMAND" in
 
     case "$answer" in
       y|Y|yes|YES)
-        docker compose down --volumes --remove-orphans
+        compose down --volumes --remove-orphans
         ;;
       *)
         info "Cancelled."
@@ -68,17 +57,17 @@ case "$COMMAND" in
     ;;
 
   restart)
-    docker compose "${COMPOSE_ARGS[@]}" restart "$@"
+    compose "${COMPOSE_ARGS[@]}" restart "$@"
     ;;
 
   rebuild)
     show_env_hint
-    docker compose "${COMPOSE_ARGS[@]}" up -d --build "$@"
+    compose "${COMPOSE_ARGS[@]}" up -d --build "$@"
     ;;
 
   shell)
     require_running
-    docker compose exec app bash "$@"
+    compose exec app bash "$@"
     ;;
 
   exec)
@@ -89,17 +78,17 @@ case "$COMMAND" in
       exit 1
     fi
 
-    docker compose exec app "$@"
+    compose exec app "$@"
     ;;
 
   node)
     require_running
-    docker compose exec app node "$@"
+    compose exec app node "$@"
     ;;
 
   pnpm)
     require_running
-    docker compose exec app pnpm "$@"
+    compose exec app pnpm "$@"
     ;;
 
   install)
@@ -107,7 +96,7 @@ case "$COMMAND" in
     require_package_json
 
     info "installing dependencies"
-    docker compose exec app pnpm install "$@"
+    compose exec app pnpm install "$@"
     ;;
 
   dev)
@@ -120,15 +109,36 @@ case "$COMMAND" in
     fi
 
     info "starting development server"
-    docker compose exec app pnpm run dev "$@"
+    compose exec app pnpm run dev "$@"
     ;;
 
+    run)
+      require_running
+      require_package_json
+
+      if [[ $# -eq 0 ]]; then
+        error "usage: fdev run <script> [arguments...]"
+        exit 1
+      fi
+
+      SCRIPT_NAME="$1"
+      shift
+
+      if ! has_package_script "$SCRIPT_NAME"; then
+        error "package.json does not define a '$SCRIPT_NAME' script"
+        exit 1
+      fi
+
+      info "running '$SCRIPT_NAME'"
+      compose exec app pnpm run "$SCRIPT_NAME" "$@"
+      ;;
+
   logs)
-    docker compose logs -f "$@"
+    compose logs -f "$@"
     ;;
 
   ps)
-    docker compose ps "$@"
+    compose ps "$@"
     ;;
 
   doctor)
@@ -142,7 +152,7 @@ case "$COMMAND" in
       DOCTOR_FAILED=1
     fi
 
-    if docker compose version >/dev/null 2>&1; then
+    if compose version >/dev/null 2>&1; then
       success "Docker Compose is available"
     else
       error "Docker Compose is not available"
@@ -156,57 +166,72 @@ case "$COMMAND" in
       DOCTOR_FAILED=1
     fi
 
+    NODE_VERSION_VALID=0
+
     if [[ -f "$NODE_VERSION_FILE" ]]; then
-      success ".node-version exists"
+      NODE_VERSION="$(tr -d '[:space:]' < "$NODE_VERSION_FILE")"
+
+      if [[ -n "$NODE_VERSION" ]]; then
+        export NODE_VERSION
+        NODE_VERSION_VALID=1
+        success ".node-version exists ($NODE_VERSION)"
+      else
+        error ".node-version is empty"
+        DOCTOR_FAILED=1
+      fi
     else
       error ".node-version is missing"
       DOCTOR_FAILED=1
     fi
 
-    if [[ -f "package.json" ]]; then
+    if [[ -f "$PROJECT_DIR/package.json" ]]; then
       success "package.json exists"
     else
       error "package.json is missing"
       DOCTOR_FAILED=1
     fi
 
-    if [[ -f ".env" ]]; then
+    if [[ -f "$PROJECT_DIR/.env" ]]; then
       success ".env exists"
-    elif [[ -f ".env.example" ]]; then
+    elif [[ -f "$PROJECT_DIR/.env.example" ]]; then
       warn ".env does not exist"
       info "defaults from compose.yaml will be used"
     else
       warn "neither .env nor .env.example exists"
     fi
 
-    if is_running; then
-      success "app container is running"
+    if [[ "$NODE_VERSION_VALID" -eq 1 ]]; then
+      if is_running; then
+        success "app container is running"
 
-      load_runtime_versions
+        load_runtime_versions
 
-      if [[ -n "$NODE_RUNTIME_VERSION" ]]; then
-        success "Node $NODE_RUNTIME_VERSION"
+        if [[ -n "$NODE_RUNTIME_VERSION" ]]; then
+          success "Node $NODE_RUNTIME_VERSION"
+        else
+          error "Node is not available in the app container"
+          DOCTOR_FAILED=1
+        fi
+
+        if [[ -n "$PNPM_RUNTIME_VERSION" ]]; then
+          success "pnpm $PNPM_RUNTIME_VERSION"
+        else
+          error "pnpm is not available in the app container"
+          DOCTOR_FAILED=1
+        fi
+
+        if [[ -n "$COREPACK_RUNTIME_VERSION" ]]; then
+          success "Corepack $COREPACK_RUNTIME_VERSION"
+        else
+          error "Corepack is not available in the app container"
+          DOCTOR_FAILED=1
+        fi
       else
-        error "Node is not available in the app container"
-        DOCTOR_FAILED=1
-      fi
-
-      if [[ -n "$PNPM_RUNTIME_VERSION" ]]; then
-        success "pnpm $PNPM_RUNTIME_VERSION"
-      else
-        error "pnpm is not available in the app container"
-        DOCTOR_FAILED=1
-      fi
-
-      if [[ -n "$COREPACK_RUNTIME_VERSION" ]]; then
-        success "Corepack $COREPACK_RUNTIME_VERSION"
-      else
-        error "Corepack is not available in the app container"
-        DOCTOR_FAILED=1
+        warn "app container is not running"
+        info "run 'fdev up' to start the environment"
       fi
     else
-      warn "app container is not running"
-      info "run 'fdev up' to start the environment"
+      warn "runtime checks skipped because Node version is not configured"
     fi
 
     if [[ "$DOCTOR_FAILED" -ne 0 ]]; then
@@ -223,8 +248,8 @@ case "$COMMAND" in
     info "project information"
 
     echo
-    printf "  Project:   %s\n" "$(basename "$PWD")"
-    printf "  Path:      %s\n" "$PWD"
+    printf "  Project:   %s\n" "$(basename "$PROJECT_DIR")"
+    printf "  Path:      %s\n" "$PROJECT_DIR"
 
     echo
     info "services"
@@ -235,11 +260,11 @@ case "$COMMAND" in
       warn "app stopped"
     fi
 
-    if docker compose --profile db ps --status running --services | grep -q '^postgres$'; then
+    if compose --profile db ps --status running --services | grep -q '^postgres$'; then
       DB_STATUS="$(
         docker inspect \
           --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
-          "$(docker compose --profile db ps -q postgres)" \
+          "$(compose --profile db ps -q postgres)" \
           2>/dev/null || true
       )"
 
@@ -281,6 +306,9 @@ Frontend Development Environment
 Usage:
   fdev <command>
 
+Alias:
+  fe          Short alias for fdev
+
 Options:
   --db        Start optional PostgreSQL service
 
@@ -299,6 +327,7 @@ Development:
   pnpm        Run pnpm
   install     Install project dependencies
   dev         Start project development server
+  run         Run a package.json script
 
 Information:
   logs        Follow container logs
