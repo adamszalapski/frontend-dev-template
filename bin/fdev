@@ -2,7 +2,18 @@
 
 set -eo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+
+while [[ -L "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 PROJECT_DIR="$PWD"
 
 source "$SCRIPT_DIR/lib/output.sh"
@@ -17,9 +28,10 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  help|--help|-h|doctor)
+  help|--help|-h|doctor|install-cli)
     ;;
   *)
+    require_fdev_project
     load_node_version
     check_docker
     ;;
@@ -139,6 +151,42 @@ case "$COMMAND" in
 
   ps)
     compose ps "$@"
+    ;;
+
+  install-cli)
+    INSTALL_DIR="${FDEV_INSTALL_DIR:-$HOME/.local/share/fdev}"
+    BIN_DIR="${FDEV_BIN_DIR:-$HOME/.local/bin}"
+
+    info "installing fdev CLI"
+
+    mkdir -p "$INSTALL_DIR/bin/lib"
+    mkdir -p "$BIN_DIR"
+
+    cp "$SCRIPT_DIR/fdev" "$INSTALL_DIR/bin/fdev"
+    cp "$SCRIPT_DIR/fe" "$INSTALL_DIR/bin/fe"
+    cp "$SCRIPT_DIR/lib/"*.sh "$INSTALL_DIR/bin/lib/"
+
+    chmod +x "$INSTALL_DIR/bin/fdev"
+    chmod +x "$INSTALL_DIR/bin/fe"
+
+    ln -sf "$INSTALL_DIR/bin/fdev" "$BIN_DIR/fdev"
+    ln -sf "$INSTALL_DIR/bin/fe" "$BIN_DIR/fe"
+
+    success "fdev CLI installed"
+    info "installation: $INSTALL_DIR"
+    info "commands:     $BIN_DIR/fdev, $BIN_DIR/fe"
+
+    case ":$PATH:" in
+      *":$BIN_DIR:"*)
+        success "$BIN_DIR is in PATH"
+        ;;
+      *)
+        warn "$BIN_DIR is not in PATH"
+        info "add this line to your shell configuration:"
+        echo
+        printf '  export PATH="%s:$PATH"\n' "$BIN_DIR"
+        ;;
+    esac
     ;;
 
   doctor)
@@ -319,6 +367,9 @@ Environment:
   restart     Restart containers
   rebuild     Rebuild images and start the environment
   destroy     Remove containers and project volumes
+
+Setup:
+  install-cli Install fdev and fe globally
 
 Development:
   shell       Open Bash inside the app container

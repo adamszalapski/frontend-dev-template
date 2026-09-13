@@ -39,3 +39,15 @@ load_node_version() {
 
   export NODE_VERSION
 }
+
+is_fdev_project() {
+  [[ -f "$PROJECT_DIR/.fdev/config.yaml" ]]
+}
+
+require_fdev_project() {
+  if ! is_fdev_project; then
+    error "current directory is not an fdev project"
+    info "missing .fdev/config.yaml"
+    exit 1
+  fi
+}
