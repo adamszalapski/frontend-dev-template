@@ -42,3 +42,23 @@ load_runtime_versions() {
   PNPM_RUNTIME_VERSION="$(compose exec -T app pnpm --version 2>/dev/null || true)"
   COREPACK_RUNTIME_VERSION="$(compose exec -T app corepack --version 2>/dev/null || true)"
 }
+
+get_app_port() {
+  local address
+
+  address="$(compose port app 3000 2>/dev/null | head -n 1)"
+
+  if [[ -z "$address" ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${address##*:}"
+}
+
+get_app_url() {
+  local port
+
+  port="$(get_app_port)" || return 1
+
+  printf 'http://localhost:%s\n' "$port"
+}

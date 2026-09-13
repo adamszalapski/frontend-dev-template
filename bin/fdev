@@ -341,6 +341,17 @@ case "$COMMAND" in
     fi
 
     if is_running; then
+      APP_URL="$(get_app_url || true)"
+
+      if [[ -n "$APP_URL" ]]; then
+        echo
+        info "application"
+
+        printf "  URL:       %s\n" "$APP_URL"
+      fi
+    fi
+
+    if is_running; then
       echo
       info "runtime"
 
