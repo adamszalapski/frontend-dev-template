@@ -34,7 +34,7 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  help|--help|-h|doctor|install-cli|init)
+  help|--help|-h|doctor|install-cli|init|templates)
     ;;
   *)
     require_fdev_project
@@ -118,6 +118,10 @@ case "$COMMAND" in
     TEMPLATE_NAME="${1:-$DEFAULT_TEMPLATE}"
 
     initialize_project "$TEMPLATE_NAME"
+    ;;
+
+  templates)
+    list_templates
     ;;
 
   install)
@@ -420,10 +424,8 @@ Environment:
 
 Setup:
   init [template]   Initialize fdev project
+  templates         List available project templates
   install-cli       Install fdev and fe globally
-
-Templates:
-  base              Generic Node.js development environment
 
 Development:
   shell       Open Bash inside the app container

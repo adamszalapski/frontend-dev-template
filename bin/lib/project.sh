@@ -160,3 +160,51 @@ require_template() {
     return 1
   fi
 }
+
+list_templates() {
+  local template_dir
+  local metadata_file
+  local template_name
+  local name
+  local description
+  local found=0
+
+  info "available templates"
+
+  echo
+
+  for template_dir in "$TEMPLATES_DIR"/*; do
+    [[ -d "$template_dir" ]] || continue
+
+    metadata_file="$template_dir/template.yaml"
+    [[ -f "$metadata_file" ]] || continue
+
+    template_name="$(basename "$template_dir")"
+
+    name="$(
+      sed -n \
+        's/^[[:space:]]*name:[[:space:]]*\(.*\)[[:space:]]*$/\1/p' \
+        "$metadata_file" |
+        head -n 1
+    )"
+
+    description="$(
+      sed -n \
+        's/^[[:space:]]*description:[[:space:]]*\(.*\)[[:space:]]*$/\1/p' \
+        "$metadata_file" |
+        head -n 1
+    )"
+
+    printf "  %-12s %-18s %s\n" \
+      "$template_name" \
+      "${name:-$template_name}" \
+      "$description"
+
+    found=1
+  done
+
+  if [[ "$found" -eq 0 ]]; then
+    warn "no templates are available"
+    return 1
+  fi
+}
