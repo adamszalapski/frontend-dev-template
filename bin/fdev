@@ -2,41 +2,23 @@
 
 set -eo pipefail
 
-check_docker() {
-  if ! command -v docker >/dev/null 2>&1; then
-    echo "fdev: Docker is not installed or not available on PATH."
-    exit 1
-  fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  if ! docker compose version >/dev/null 2>&1; then
-    echo "fdev: Docker Compose is not available."
-    exit 1
-  fi
-
-  if ! docker info >/dev/null 2>&1; then
-    echo "fdev: Docker daemon is not running."
-    exit 1
-  fi
-}
-
-show_env_hint() {
-  if [[ ! -f ".env" && -f ".env.example" ]]; then
-    echo "fdev: using default environment values."
-    echo "fdev: copy .env.example to .env to customize them."
-  fi
-}
+source "$SCRIPT_DIR/lib/output.sh"
+source "$SCRIPT_DIR/lib/docker.sh"
+source "$SCRIPT_DIR/lib/env.sh"
 
 NODE_VERSION_FILE=".node-version"
 
 if [[ ! -f "$NODE_VERSION_FILE" ]]; then
-  echo "fdev: missing .node-version"
+  error "missing .node-version"
   exit 1
 fi
 
 NODE_VERSION="$(tr -d '[:space:]' < "$NODE_VERSION_FILE")"
 
 if [[ -z "$NODE_VERSION" ]]; then
-  echo "fdev: .node-version is empty"
+  error ".node-version is empty"
   exit 1
 fi
 
@@ -69,18 +51,6 @@ done
 
 set -- "${COMMAND_ARGS[@]}"
 
-is_running() {
-  docker compose ps --status running --services | grep -q '^app$'
-}
-
-require_running() {
-  if ! is_running; then
-    echo "fdev: environment is not running."
-    echo "Run: fdev up"
-    exit 1
-  fi
-}
-
 case "$COMMAND" in
   up)
     show_env_hint
@@ -96,7 +66,7 @@ case "$COMMAND" in
     ;;
 
   destroy)
-    echo "This will remove containers and project volumes."
+    warn "This will remove containers and project volumes."
     read -r -p "Continue? [y/N] " answer
 
     case "$answer" in
@@ -104,7 +74,7 @@ case "$COMMAND" in
         docker compose down --volumes --remove-orphans
         ;;
       *)
-        echo "Cancelled."
+        info "Cancelled."
         ;;
     esac
     ;;
@@ -127,7 +97,7 @@ case "$COMMAND" in
     require_running
 
     if [[ $# -eq 0 ]]; then
-      echo "Usage: fdev exec <command> [arguments...]"
+      error "Usage: fdev exec <command> [arguments...]"
       exit 1
     fi
 
@@ -144,6 +114,27 @@ case "$COMMAND" in
     docker compose exec app pnpm "$@"
     ;;
 
+  install)
+    require_running
+    require_package_json
+
+    info "installing dependencies"
+    docker compose exec app pnpm install "$@"
+    ;;
+
+  dev)
+    require_running
+
+    if ! has_package_script "dev"; then
+      error "package.json does not define a 'dev' script"
+      info "add a dev script for your framework, for example Next.js or Vite"
+      exit 1
+    fi
+
+    info "starting development server"
+    docker compose exec app pnpm run dev "$@"
+    ;;
+
   logs)
     docker compose logs -f "$@"
     ;;
@@ -152,46 +143,147 @@ case "$COMMAND" in
     docker compose ps "$@"
     ;;
 
-  info)
-    echo "Frontend Development Environment"
-    echo
-    echo "Project:   $(basename "$PWD")"
-    echo "Path:      $PWD"
-    echo "Node:      $NODE_VERSION"
-    echo
+  doctor)
+    info "checking development environment..."
+    DOCTOR_FAILED=0
 
-    echo "Services:"
-
-    if docker compose ps --status running --services | grep -q '^app$'; then
-      echo "  app       running"
+    if command -v docker >/dev/null 2>&1; then
+      success "Docker is available"
     else
-      echo "  app       stopped"
+      error "Docker is not available"
+      DOCTOR_FAILED=1
+    fi
+
+    if docker compose version >/dev/null 2>&1; then
+      success "Docker Compose is available"
+    else
+      error "Docker Compose is not available"
+      DOCTOR_FAILED=1
+    fi
+
+    if docker info >/dev/null 2>&1; then
+      success "Docker daemon is running"
+    else
+      error "Docker daemon is not running"
+      DOCTOR_FAILED=1
+    fi
+
+    if [[ -f "$NODE_VERSION_FILE" ]]; then
+      success ".node-version exists"
+    else
+      error ".node-version is missing"
+      DOCTOR_FAILED=1
+    fi
+
+    if [[ -f "package.json" ]]; then
+      success "package.json exists"
+    else
+      error "package.json is missing"
+      DOCTOR_FAILED=1
+    fi
+
+    if [[ -f ".env" ]]; then
+      success ".env exists"
+    elif [[ -f ".env.example" ]]; then
+      warn ".env does not exist"
+      info "defaults from compose.yaml will be used"
+    else
+      warn "neither .env nor .env.example exists"
+    fi
+
+    if is_running; then
+      success "app container is running"
+
+      load_runtime_versions
+
+      if [[ -n "$NODE_RUNTIME_VERSION" ]]; then
+        success "Node $NODE_RUNTIME_VERSION"
+      else
+        error "Node is not available in the app container"
+        DOCTOR_FAILED=1
+      fi
+
+      if [[ -n "$PNPM_RUNTIME_VERSION" ]]; then
+        success "pnpm $PNPM_RUNTIME_VERSION"
+      else
+        error "pnpm is not available in the app container"
+        DOCTOR_FAILED=1
+      fi
+
+      if [[ -n "$COREPACK_RUNTIME_VERSION" ]]; then
+        success "Corepack $COREPACK_RUNTIME_VERSION"
+      else
+        error "Corepack is not available in the app container"
+        DOCTOR_FAILED=1
+      fi
+    else
+      warn "app container is not running"
+      info "run 'fdev up' to start the environment"
+    fi
+
+    if [[ "$DOCTOR_FAILED" -ne 0 ]]; then
+      echo
+      error "environment check failed"
+      exit 1
+    fi
+
+    echo
+    success "environment looks healthy"
+    ;;
+
+  info)
+    info "project information"
+
+    echo
+    printf "  Project:   %s\n" "$(basename "$PWD")"
+    printf "  Path:      %s\n" "$PWD"
+
+    echo
+    info "services"
+
+    if is_running; then
+      success "app running"
+    else
+      warn "app stopped"
     fi
 
     if docker compose --profile db ps --status running --services | grep -q '^postgres$'; then
-      DB_STATUS="$(docker inspect \
-        --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
-        "$(docker compose --profile db ps -q postgres)" 2>/dev/null || true)"
+      DB_STATUS="$(
+        docker inspect \
+          --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+          "$(docker compose --profile db ps -q postgres)" \
+          2>/dev/null || true
+      )"
 
-      echo "  postgres  ${DB_STATUS:-running}"
+      if [[ "$DB_STATUS" == "healthy" ]]; then
+        success "postgres healthy"
+      else
+        warn "postgres ${DB_STATUS:-running}"
+      fi
     else
-      echo "  postgres  stopped"
+      warn "postgres stopped"
     fi
 
     if is_running; then
       echo
-      echo "Runtime:"
-      echo "  Node:     $(docker compose exec -T app node --version)"
-      echo "  pnpm:     $(docker compose exec -T app pnpm --version)"
-      echo "  Corepack: $(docker compose exec -T app corepack --version)"
+      info "runtime"
+
+      load_runtime_versions
+
+      printf "  Node:      %s\n" "$NODE_RUNTIME_VERSION"
+      printf "  pnpm:      %s\n" "$PNPM_RUNTIME_VERSION"
+      printf "  Corepack:  %s\n" "$COREPACK_RUNTIME_VERSION"
     fi
     ;;
 
   version)
-    require_running
-    echo "Node:     $(docker compose exec -T app node --version)"
-    echo "pnpm:     $(docker compose exec -T app pnpm --version)"
-    echo "Corepack: $(docker compose exec -T app corepack --version)"
+    load_runtime_versions
+
+    info "runtime versions"
+
+    printf "  Node:      %s\n" "$NODE_RUNTIME_VERSION"
+    printf "  pnpm:      %s\n" "$PNPM_RUNTIME_VERSION"
+    printf "  Corepack:  %s\n" "$COREPACK_RUNTIME_VERSION"
     ;;
 
   help|--help|-h)
@@ -217,12 +309,15 @@ Development:
   exec        Run any command inside the app container
   node        Run Node
   pnpm        Run pnpm
+  install     Install project dependencies
+  dev         Start project development server
 
 Information:
   logs        Follow container logs
   ps          Show container status
   info        Show project and runtime information
   version     Show runtime versions
+  doctor      Check development environment
   help        Show this help
 
 Configuration:
@@ -234,9 +329,9 @@ HELP
     ;;
 
   *)
-    echo "fdev: unknown command: $COMMAND"
+    error "unknown command: $COMMAND"
     echo
-    echo "Run 'fdev help' for available commands."
+    info "Run 'fdev help' for available commands."
     exit 1
     ;;
 esac
