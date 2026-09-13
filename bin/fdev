@@ -15,7 +15,8 @@ done
 
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 FDEV_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$FDEV_ROOT/templates/base"
+TEMPLATES_DIR="$FDEV_ROOT/templates"
+DEFAULT_TEMPLATE="base"
 
 PROJECT_DIR="$PWD"
 
@@ -109,7 +110,14 @@ case "$COMMAND" in
     ;;
 
   init)
-    initialize_project
+    if [[ $# -gt 1 ]]; then
+      error "usage: fdev init [template]"
+      exit 1
+    fi
+
+    TEMPLATE_NAME="${1:-$DEFAULT_TEMPLATE}"
+
+    initialize_project "$TEMPLATE_NAME"
     ;;
 
   install)
@@ -190,8 +198,8 @@ case "$COMMAND" in
     cp "$SCRIPT_DIR/fe" "$INSTALL_DIR/bin/fe"
     cp "$SCRIPT_DIR/lib/"*.sh "$INSTALL_DIR/bin/lib/"
 
-    rm -rf "$INSTALL_DIR/templates/base"
-    cp -R "$FDEV_ROOT/templates/base" "$INSTALL_DIR/templates/base"
+    rm -rf "$INSTALL_DIR/templates"
+    cp -R "$TEMPLATES_DIR" "$INSTALL_DIR/templates"
     cp "$FDEV_ROOT/package.json" "$INSTALL_DIR/package.json"
     cp "$FDEV_ROOT/.node-version" "$INSTALL_DIR/.node-version"
     
@@ -411,8 +419,11 @@ Environment:
   destroy     Remove containers and project volumes
 
 Setup:
-  init        Initialize fdev in the current project
-  install-cli Install fdev and fe globally
+  init [template]   Initialize fdev project
+  install-cli       Install fdev and fe globally
+
+Templates:
+  base              Generic Node.js development environment
 
 Development:
   shell       Open Bash inside the app container

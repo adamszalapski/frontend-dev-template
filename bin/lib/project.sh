@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 copy_template_file() {
-  local relative_path="$1"
-  local source="$TEMPLATE_DIR/$relative_path"
+  local template_dir="$1"
+  local relative_path="$2"
+  local source="$template_dir/$relative_path"
   local target="$PROJECT_DIR/$relative_path"
 
   if [[ -e "$target" ]]; then
@@ -22,32 +23,51 @@ copy_template_file() {
 }
 
 initialize_project() {
+  local template_name="${1:-$DEFAULT_TEMPLATE}"
+  local template_dir
   local config_dir="$PROJECT_DIR/.fdev"
   local config_file="$config_dir/config.yaml"
 
-  if [[ ! -d "$TEMPLATE_DIR" ]]; then
-    error "base template is not available"
-    return 1
-  fi
+  require_template "$template_name" || return 1
+
+  template_dir="$(get_template_dir "$template_name")"
 
   if [[ -f "$config_file" ]]; then
+    local current_template
+
+    current_template="$(
+      sed -n \
+        's/^[[:space:]]*template:[[:space:]]*\(.*\)[[:space:]]*$/\1/p' \
+        "$config_file" |
+        head -n 1
+    )"
+
+    if [[ -n "$current_template" && "$current_template" != "$template_name" ]]; then
+      error "project is already initialized with template '$current_template'"
+      info "requested template: $template_name"
+      return 1
+    fi
+
     warn "project is already initialized"
   else
     mkdir -p "$config_dir"
-    printf 'version: 1\n' > "$config_file"
+
+    printf 'version: 1\ntemplate: %s\n' "$template_name" > "$config_file"
+
     success "created .fdev/config.yaml"
   fi
 
-  copy_template_file ".fdev/compose.yaml"
-  copy_template_file ".fdev/.env.example"
+  copy_template_file "$template_dir" ".fdev/compose.yaml"
+  copy_template_file "$template_dir" ".fdev/.env.example"
 
   create_node_version
   create_package_json
 
-  copy_template_file ".fdev/docker/app/Dockerfile"
+  copy_template_file "$template_dir" ".fdev/docker/app/Dockerfile"
 
   echo
   success "fdev project is ready"
+  info "template: $template_name"
 }
 
 get_package_manager() {
@@ -116,4 +136,27 @@ create_node_version() {
   printf '%s\n' "$node_version" > "$target"
 
   success "created .node-version (Node $node_version)"
+}
+
+get_template_dir() {
+  local template_name="$1"
+
+  printf '%s/%s\n' "$TEMPLATES_DIR" "$template_name"
+}
+
+require_template() {
+  local template_name="$1"
+  local template_dir
+
+  template_dir="$(get_template_dir "$template_name")"
+
+  if [[ ! -d "$template_dir" ]]; then
+    error "template '$template_name' does not exist"
+    return 1
+  fi
+
+  if [[ ! -f "$template_dir/template.yaml" ]]; then
+    error "template '$template_name' is invalid"
+    return 1
+  fi
 }
