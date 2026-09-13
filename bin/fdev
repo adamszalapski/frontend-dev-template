@@ -2,6 +2,30 @@
 
 set -eo pipefail
 
+check_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "fdev: Docker is not installed or not available on PATH."
+    exit 1
+  fi
+
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "fdev: Docker Compose is not available."
+    exit 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "fdev: Docker daemon is not running."
+    exit 1
+  fi
+}
+
+show_env_hint() {
+  if [[ ! -f ".env" && -f ".env.example" ]]; then
+    echo "fdev: using default environment values."
+    echo "fdev: copy .env.example to .env to customize them."
+  fi
+}
+
 NODE_VERSION_FILE=".node-version"
 
 if [[ ! -f "$NODE_VERSION_FILE" ]]; then
@@ -20,6 +44,14 @@ export NODE_VERSION
 
 COMMAND="${1:-help}"
 shift || true
+
+case "$COMMAND" in
+  help|--help|-h)
+    ;;
+  *)
+    check_docker
+    ;;
+esac
 
 COMPOSE_ARGS=()
 COMMAND_ARGS=()
@@ -51,6 +83,7 @@ require_running() {
 
 case "$COMMAND" in
   up)
+    show_env_hint
     docker compose "${COMPOSE_ARGS[@]}" up -d "$@"
     ;;
 
@@ -81,6 +114,7 @@ case "$COMMAND" in
     ;;
 
   rebuild)
+    show_env_hint
     docker compose "${COMPOSE_ARGS[@]}" up -d --build "$@"
     ;;
 
@@ -167,6 +201,9 @@ Frontend Development Environment
 Usage:
   fdev <command>
 
+Options:
+  --db        Start optional PostgreSQL service
+
 Environment:
   up          Start the environment
   stop        Stop containers without removing them
@@ -187,6 +224,12 @@ Information:
   info        Show project and runtime information
   version     Show runtime versions
   help        Show this help
+
+Configuration:
+  Copy .env.example to .env to customize ports and database settings.
+
+Host requirements:
+  Docker with Docker Compose support
 HELP
     ;;
 
