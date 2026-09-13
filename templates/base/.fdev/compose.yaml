@@ -39,4 +39,5 @@ services:
 
 volumes:
   node_modules:
+  pnpm_store:
   postgres_data:
