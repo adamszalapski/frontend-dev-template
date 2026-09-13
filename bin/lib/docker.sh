@@ -74,3 +74,9 @@ get_app_url() {
 
   printf 'http://localhost:%s\n' "$port"
 }
+
+is_docker_ready() {
+  command -v docker >/dev/null 2>&1 \
+    && docker compose version >/dev/null 2>&1 \
+    && docker info >/dev/null 2>&1
+}
