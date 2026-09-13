@@ -24,6 +24,7 @@ source "$SCRIPT_DIR/lib/docker.sh"
 source "$SCRIPT_DIR/lib/env.sh"
 source "$SCRIPT_DIR/lib/args.sh"
 source "$SCRIPT_DIR/lib/project.sh"
+source "$SCRIPT_DIR/lib/system.sh"
 
 NODE_VERSION_FILE="$PROJECT_DIR/.node-version"
 NODE_VERSION=""
@@ -132,26 +133,40 @@ case "$COMMAND" in
     compose exec app pnpm run dev "$@"
     ;;
 
-    run)
-      require_running
-      require_package_json
+  run)
+    require_running
+    require_package_json
 
-      if [[ $# -eq 0 ]]; then
-        error "usage: fdev run <script> [arguments...]"
-        exit 1
-      fi
+    if [[ $# -eq 0 ]]; then
+      error "usage: fdev run <script> [arguments...]"
+      exit 1
+    fi
 
-      SCRIPT_NAME="$1"
-      shift
+    SCRIPT_NAME="$1"
+    shift
 
-      if ! has_package_script "$SCRIPT_NAME"; then
-        error "package.json does not define a '$SCRIPT_NAME' script"
-        exit 1
-      fi
+    if ! has_package_script "$SCRIPT_NAME"; then
+      error "package.json does not define a '$SCRIPT_NAME' script"
+      exit 1
+    fi
 
-      info "running '$SCRIPT_NAME'"
-      compose exec app pnpm run "$SCRIPT_NAME" "$@"
-      ;;
+    info "running '$SCRIPT_NAME'"
+    compose exec app pnpm run "$SCRIPT_NAME" "$@"
+    ;;
+
+  open)
+    require_running
+
+    APP_URL="$(get_app_url || true)"
+
+    if [[ -z "$APP_URL" ]]; then
+      error "application URL is not available"
+      exit 1
+    fi
+
+    info "opening $APP_URL"
+    open_url "$APP_URL"
+    ;;
 
   logs)
     compose logs -f "$@"
@@ -406,6 +421,7 @@ Development:
   install     Install project dependencies
   dev         Start project development server
   run         Run a package.json script
+  open        Open application in the default browser
 
 Information:
   logs        Follow container logs
