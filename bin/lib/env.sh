@@ -51,3 +51,16 @@ require_fdev_project() {
     exit 1
   fi
 }
+
+get_fdev_version() {
+  local package_file="$FDEV_ROOT/package.json"
+
+  if [[ ! -f "$package_file" ]]; then
+    return 1
+  fi
+
+  sed -n \
+    's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    "$package_file" |
+    head -n 1
+}

@@ -34,7 +34,7 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
-  help|--help|-h|doctor|install-cli|init|templates)
+  help|--help|-h|doctor|install-cli|init|templates|version)
     ;;
 
   update)
@@ -401,13 +401,30 @@ case "$COMMAND" in
     ;;
 
   version)
-    load_runtime_versions
+    FDEV_VERSION="$(get_fdev_version || true)"
 
-    info "runtime versions"
+    info "fdev version"
 
-    printf "  Node:      %s\n" "$NODE_RUNTIME_VERSION"
-    printf "  pnpm:      %s\n" "$PNPM_RUNTIME_VERSION"
-    printf "  Corepack:  %s\n" "$COREPACK_RUNTIME_VERSION"
+    printf "  fdev:      %s\n" "${FDEV_VERSION:-unknown}"
+
+    if is_fdev_project; then
+      load_node_version
+
+      if command -v docker >/dev/null 2>&1 \
+        && docker compose version >/dev/null 2>&1 \
+        && docker info >/dev/null 2>&1 \
+        && is_running; then
+
+        echo
+        info "runtime versions"
+
+        load_runtime_versions
+
+        printf "  Node:      %s\n" "$NODE_RUNTIME_VERSION"
+        printf "  pnpm:      %s\n" "$PNPM_RUNTIME_VERSION"
+        printf "  Corepack:  %s\n" "$COREPACK_RUNTIME_VERSION"
+      fi
+    fi
     ;;
 
   help|--help|-h)
