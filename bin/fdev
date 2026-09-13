@@ -14,12 +14,16 @@ while [[ -L "$SOURCE" ]]; do
 done
 
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
+FDEV_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TEMPLATE_DIR="$FDEV_ROOT/templates/base"
+
 PROJECT_DIR="$PWD"
 
 source "$SCRIPT_DIR/lib/output.sh"
 source "$SCRIPT_DIR/lib/docker.sh"
 source "$SCRIPT_DIR/lib/env.sh"
 source "$SCRIPT_DIR/lib/args.sh"
+source "$SCRIPT_DIR/lib/project.sh"
 
 NODE_VERSION_FILE="$PROJECT_DIR/.node-version"
 NODE_VERSION=""
@@ -104,21 +108,7 @@ case "$COMMAND" in
     ;;
 
   init)
-    CONFIG_DIR="$PROJECT_DIR/.fdev"
-    CONFIG_FILE="$CONFIG_DIR/config.yaml"
-
-    if [[ -f "$CONFIG_FILE" ]]; then
-      warn "project is already initialized"
-      info "$CONFIG_FILE already exists"
-      exit 0
-    fi
-
-    mkdir -p "$CONFIG_DIR"
-
-    printf 'version: 1\n' > "$CONFIG_FILE"
-
-    success "initialized fdev project"
-    info "created .fdev/config.yaml"
+    initialize_project
     ;;
 
   install)
@@ -178,11 +168,15 @@ case "$COMMAND" in
     info "installing fdev CLI"
 
     mkdir -p "$INSTALL_DIR/bin/lib"
+    mkdir -p "$INSTALL_DIR/templates"
     mkdir -p "$BIN_DIR"
 
     cp "$SCRIPT_DIR/fdev" "$INSTALL_DIR/bin/fdev"
     cp "$SCRIPT_DIR/fe" "$INSTALL_DIR/bin/fe"
     cp "$SCRIPT_DIR/lib/"*.sh "$INSTALL_DIR/bin/lib/"
+
+    rm -rf "$INSTALL_DIR/templates/base"
+    cp -R "$SCRIPT_DIR/../templates/base" "$INSTALL_DIR/templates/base"
 
     chmod +x "$INSTALL_DIR/bin/fdev"
     chmod +x "$INSTALL_DIR/bin/fe"
