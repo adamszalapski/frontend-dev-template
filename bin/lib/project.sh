@@ -5,10 +5,17 @@ initialize_project() {
   local template_dir
   local config_dir="$PROJECT_DIR/.fdev"
   local config_file="$config_dir/config.yaml"
+  local template_version
 
   require_template "$template_name" || return 1
 
   template_dir="$(get_template_dir "$template_name")"
+  template_version="$(get_template_version "$template_name")"
+
+  if [[ -z "$template_version" ]]; then
+    error "template '$template_name' does not define a version"
+    return 1
+  fi
 
   if [[ -f "$config_file" ]]; then
     local current_template
@@ -30,7 +37,11 @@ initialize_project() {
   else
     mkdir -p "$config_dir"
 
-    printf 'version: 1\ntemplate: %s\n' "$template_name" > "$config_file"
+    printf \
+      'version: 1\ntemplate: %s\ntemplateVersion: %s\n' \
+      "$template_name" \
+      "$template_version" \
+      > "$config_file"
 
     success "created .fdev/config.yaml"
   fi
